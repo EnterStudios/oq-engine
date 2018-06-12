@@ -175,29 +175,31 @@ class EbrCalculator(base.RiskCalculator):
                     'The parent calculation was using minimum_intensity=%s'
                     ' != %s' % (oqp.minimum_intensity, oq.minimum_intensity))
         else:
-            ebcalc = base.calculators[self.pre_calculator](self.oqparam)
+            ebcalc = base.calculators[self.pre_calculator](
+                self.oqparam, self.datastore.calc_id)
             ebcalc.run(close=False)
             self.set_log_format()
             parent = self.dynamic_parent = self.datastore.parent = (
                 ebcalc.datastore)
-            oq.hazard_calculation_id = parent.calc_id
-            self.datastore['oqparam'] = oq
             self.param = ebcalc.param
             self.sitecol = ebcalc.sitecol
             self.assetcol = ebcalc.datastore['assetcol']
             self.riskmodel = ebcalc.riskmodel
+            self.csm = ebcalc.csm
+            self._R = ebcalc._R
 
         self.L = len(self.riskmodel.lti)
         self.T = len(self.assetcol.tagcol)
         self.A = len(self.assetcol)
         self.I = oq.insured_losses + 1
         if parent:
-            self.datastore['csm_info'] = parent['csm_info']
-            self.rlzs_assoc = parent['csm_info'].get_rlzs_assoc()
+            self.datastore['csm_info'] = csm_info = parent['csm_info']
+            self.rlzs_assoc = csm_info.get_rlzs_assoc()
             if oq.return_periods != [0]:
                 # setting return_periods = 0 disable loss curves and maps
+                weights = csm_info.rlzs['weight']
                 self.param['builder'] = get_loss_builder(
-                    parent, oq.return_periods, oq.loss_dt())
+                    parent, weights, oq.return_periods, oq.loss_dt())
             self.eids = sorted(parent['events']['eid'])
         else:
             self.eids = sorted(self.datastore['events']['eid'])
@@ -205,6 +207,7 @@ class EbrCalculator(base.RiskCalculator):
         # order (i.e. consistent with the one used in ebr from ruptures)
         self.E = len(self.eids)
         eps = self.epsilon_getter()()
+        self.datastore.hdf5.swmr = True
         self.riskinputs = self.build_riskinputs('gmf', eps, self.E)
         self.param['insured_losses'] = oq.insured_losses
         self.param['avg_losses'] = oq.avg_losses

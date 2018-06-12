@@ -32,7 +32,6 @@ from openquake.baselib import (
     config, general, hdf5, datastore, __version__ as engine_version)
 from openquake.baselib.performance import Monitor
 from openquake.hazardlib.calc.filters import SourceFilter, RtreeFilter, rtree
-from openquake.hazardlib.source.base import BaseSeismicSource
 from openquake.risklib import riskinput, riskmodels
 from openquake.commonlib import readinput, source, calc, writers
 from openquake.baselib.parallel import Starmap
@@ -294,7 +293,7 @@ class BaseCalculator(metaclass=abc.ABCMeta):
         Set the attributes nbytes
         """
         # sanity check that eff_ruptures have been set, i.e. are not -1
-        csm_info = self.datastore['csm_info']
+        csm_info = self.csm.info
         for sm in csm_info.source_models:
             for sg in sm.src_groups:
                 assert sg.eff_ruptures != -1, sg
@@ -463,6 +462,7 @@ class HazardCalculator(BaseCalculator):
         else:  # build a fake; used by risk-from-file calculators
             self.datastore['csm_info'] = fake = source.CompositionInfo.fake()
             self.rlzs_assoc = fake.get_rlzs_assoc()
+        self._R = len(self.rlzs_assoc.realizations)
 
     def read_exposure(self, haz_sitecol=None):
         """
